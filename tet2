@@ -1,27 +1,23 @@
 --[[
-    KRIMO HUB - BAC COMPLETE BYPASS
+    KRIMO HUB - ULTRA INSTANT REDEEM (0.001s)
     Made by momo.1711
 ]]
 
 -- ============================================
--- BAC-4518, BAC-6512, BAC-6519 BYPASS
+-- BAC COMPLETE BYPASS
 -- ============================================
-
--- 1. KICK BYPASS (für alle BAC Codes)
 pcall(function()
     local LP = game:GetService("Players").LocalPlayer
     LP.Kick = function() return nil end
     LP.kick = function() return nil end
 end)
 
--- 2. SCRIPT NAME SPOOFING
 pcall(function()
     if getfenv and getfenv().script then
         getfenv().script.Name = "System_" .. tostring(math.random(10000,99999))
     end
 end)
 
--- 3. METATABLE BYPASS
 pcall(function()
     local old = getrawmetatable(game)
     if old then
@@ -32,14 +28,12 @@ pcall(function()
     end
 end)
 
--- 4. DEAKTIVIERE DEBUG
 pcall(function()
     debug.info = function() return nil end
     debug.getinfo = function() return nil end
     debug.getupvalue = function() return nil end
 end)
 
--- 5. VERSTECKE SCRIPT VOR SCANS
 pcall(function()
     local s = getfenv().script
     if s then
@@ -49,7 +43,7 @@ pcall(function()
 end)
 
 -- ============================================
--- ORIGINAL CODE (UNVERÄNDERT)
+-- ORIGINAL CODE (MIT EXTRA SPEED)
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -78,16 +72,15 @@ local _promptConnection = nil
 local _renderConnection = nil
 local _isMinimized = false
 
--- KRIMO HUB GUI
+-- ============================================
+-- GUI (SELBE WIE VORHER)
+-- ============================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "KrimoHub"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = PlayerGui
 
--- ============================================
--- MINI BUTTON (K)
--- ============================================
 local miniBtn = Instance.new("TextButton")
 miniBtn.Size = UDim2.new(0, 40, 0, 40)
 miniBtn.Position = UDim2.new(1, -50, 0, 10)
@@ -124,9 +117,6 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- ============================================
--- HAUPT GUI FRAME
--- ============================================
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 340, 0, 210)
 frame.Position = UDim2.new(1, -350, 0, 10)
@@ -188,7 +178,6 @@ titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.TextYAlignment = Enum.TextYAlignment.Center
 titleLabel.Parent = header
 
--- MINUS BUTTON
 local minusBtn = Instance.new("TextButton")
 minusBtn.Size = UDim2.new(0, 22, 0, 22)
 minusBtn.AnchorPoint = Vector2.new(1, 0.5)
@@ -210,7 +199,6 @@ minusStroke.Color = Color3.fromRGB(200, 50, 50)
 minusStroke.Thickness = 1
 minusStroke.Parent = minusBtn
 
--- ON/OFF BUTTON
 local onBtn = Instance.new("TextButton")
 onBtn.Size = UDim2.new(0, 40, 0, 18)
 onBtn.AnchorPoint = Vector2.new(1, 0.5)
@@ -489,7 +477,6 @@ autoBuyStroke.Color = Color3.fromRGB(30, 30, 50)
 autoBuyStroke.Thickness = 1
 autoBuyStroke.Parent = autoBuyBtn
 
--- CREDIT
 local creditLabel = Instance.new("TextLabel")
 creditLabel.Size = UDim2.new(1, 0, 0, 16)
 creditLabel.Position = UDim2.new(0, 0, 0, 193)
@@ -502,29 +489,6 @@ creditLabel.TextColor3 = Color3.fromRGB(100, 100, 140)
 creditLabel.TextXAlignment = Enum.TextXAlignment.Center
 creditLabel.TextYAlignment = Enum.TextYAlignment.Center
 creditLabel.Parent = frame
-
--- ============================================
--- MINIMIZE
--- ============================================
-local function toggleMinimize()
-    _isMinimized = not _isMinimized
-    if _isMinimized then
-        frame.Visible = false
-        miniBtn.Visible = true
-        minusBtn.Text = "+"
-        minusBtn.BackgroundColor3 = Color3.fromRGB(60, 220, 90)
-        minusStroke.Color = Color3.fromRGB(60, 220, 90)
-    else
-        frame.Visible = true
-        miniBtn.Visible = false
-        minusBtn.Text = "−"
-        minusBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        minusStroke.Color = Color3.fromRGB(200, 50, 50)
-    end
-end
-
-minusBtn.MouseButton1Click:Connect(toggleMinimize)
-miniBtn.MouseButton1Click:Connect(toggleMinimize)
 
 -- ============================================
 -- FUNCTIONS
@@ -563,6 +527,29 @@ local function flashCode(code)
     detectedCode.TextColor3 = Color3.fromRGB(80, 255, 120)
     detectedStroke.Color = Color3.fromRGB(80, 255, 120)
 end
+
+-- ============================================
+-- MINIMIZE
+-- ============================================
+local function toggleMinimize()
+    _isMinimized = not _isMinimized
+    if _isMinimized then
+        frame.Visible = false
+        miniBtn.Visible = true
+        minusBtn.Text = "+"
+        minusBtn.BackgroundColor3 = Color3.fromRGB(60, 220, 90)
+        minusStroke.Color = Color3.fromRGB(60, 220, 90)
+    else
+        frame.Visible = true
+        miniBtn.Visible = false
+        minusBtn.Text = "−"
+        minusBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        minusStroke.Color = Color3.fromRGB(200, 50, 50)
+    end
+end
+
+minusBtn.MouseButton1Click:Connect(toggleMinimize)
+miniBtn.MouseButton1Click:Connect(toggleMinimize)
 
 -- ============================================
 -- FREEZE
@@ -823,8 +810,7 @@ local function watchTextBox(obj)
     if not obj:IsA("TextBox") then return end
     if obj:IsDescendantOf(screenGui) then return end
     obj.Focused:Connect(function()
-        if not pickMode then return end
-        targetBox = obj
+        if not pickMode then return end        targetBox = obj
         stopPicking()
         setStatus("Target: " .. obj.Name, Color3.fromRGB(80, 255, 120))
     end)
@@ -869,7 +855,9 @@ afterBox.FocusLost:Connect(function()
     end
 end)
 
--- PRESS ENTER
+-- ============================================
+-- ULTRA INSTANT REDEEM (0.001 Sekunden)
+-- ============================================
 local function pressEnter()
     pcall(function()
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
@@ -880,32 +868,8 @@ local function pressEnter()
             targetBox:ReleaseFocus(true)
         end
     end)
-    pcall(function()
-        if PlayerGui then
-            for _, obj in ipairs(PlayerGui:GetDescendants()) do
-                if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and obj.Visible then
-                    local name = string.lower(obj.Name)
-                    local text = obj:IsA("TextButton") and string.lower(obj.Text) or ""
-                    if name:find("submit") or name:find("redeem") or name:find("claim") or
-                       text:find("submit") or text:find("redeem") or text:find("claim") then
-                        if obj:FindFirstChild("MouseButton1Click") then
-                            for _, conn in ipairs(getconnections(obj.MouseButton1Click)) do
-                                pcall(function() conn:Fire() end)
-                            end
-                        end
-                        pcall(function()
-                            obj:CaptureFocus()
-                            obj:ReleaseFocus(true)
-                        end)
-                        break
-                    end
-                end
-            end
-        end
-    end)
 end
 
--- COLLECT & REDEEM
 local function collectAndRedeem(code)
     if not code or code == "" then return end
     if not _enabled then return end
@@ -930,14 +894,17 @@ local function collectAndRedeem(code)
                 targetBox.CursorPosition = #combined + 1
             end)
         end
-        task.wait(0.01)
+        
+        task.wait(0.001)  -- ⚡ ULTRA INSTANT (1ms)
         pressEnter()
+        
         _enabled = false
         onBtn.Text = "OFF"
         onBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
         onBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         onStroke.Color = Color3.fromRGB(220, 60, 60)
         setStatus("Redeemed! Auto OFF", Color3.fromRGB(255, 200, 50))
+        
         _collectedCodes = {}
         _wordCount = 0
         updateWordDisplay()
@@ -945,7 +912,9 @@ local function collectAndRedeem(code)
     _processingLock = false
 end
 
+-- ============================================
 -- PASTE CODE
+-- ============================================
 local function pasteCode(text)
     if not _enabled then return end
     local code = text:gsub("%s+", "")
@@ -969,7 +938,9 @@ local function pasteCode(text)
     collectAndRedeem(code)
 end
 
+-- ============================================
 -- GLOBAL BROADCAST REMOTE HOOK
+-- ============================================
 local KNOWN_HASH = "631ab0616c0445747139929dee141f4f24b2d7393b69ef081421b99587bfe780"
 local globalRemote = nil
 local _hookActive = false
