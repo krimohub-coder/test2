@@ -1,0 +1,1047 @@
+--[[
+    KRIMO HUB - BAC COMPLETE BYPASS
+    Made by momo.1711
+]]
+
+-- ============================================
+-- BAC-4518, BAC-6512, BAC-6519 BYPASS
+-- ============================================
+
+-- 1. KICK BYPASS (für alle BAC Codes)
+pcall(function()
+    local LP = game:GetService("Players").LocalPlayer
+    LP.Kick = function() return nil end
+    LP.kick = function() return nil end
+end)
+
+-- 2. SCRIPT NAME SPOOFING
+pcall(function()
+    if getfenv and getfenv().script then
+        getfenv().script.Name = "System_" .. tostring(math.random(10000,99999))
+    end
+end)
+
+-- 3. METATABLE BYPASS
+pcall(function()
+    local old = getrawmetatable(game)
+    if old then
+        setreadonly(old, false)
+        old.__namecall = old.__namecall or function() end
+        old.__index = old.__index or function() end
+        old.__newindex = old.__newindex or function() end
+    end
+end)
+
+-- 4. DEAKTIVIERE DEBUG
+pcall(function()
+    debug.info = function() return nil end
+    debug.getinfo = function() return nil end
+    debug.getupvalue = function() return nil end
+end)
+
+-- 5. VERSTECKE SCRIPT VOR SCANS
+pcall(function()
+    local s = getfenv().script
+    if s then
+        s.Disabled = true
+        s.Enabled = false
+    end
+end)
+
+-- ============================================
+-- ORIGINAL CODE (UNVERÄNDERT)
+-- ============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local RS = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local targetBox = nil
+local pickMode = false
+local _enabled = true
+local _collectedCodes = {}
+local _wordCount = 0
+local _targetCount = 3
+local _processingLock = false
+local _frozen = false
+local _autoBuyRunning = false
+local _buyConnection = nil
+local _buyTimer = 0
+local _proximityPrompts = {}
+local _promptConnection = nil
+local _renderConnection = nil
+local _isMinimized = false
+
+-- KRIMO HUB GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "KrimoHub"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = PlayerGui
+
+-- ============================================
+-- MINI BUTTON (K)
+-- ============================================
+local miniBtn = Instance.new("TextButton")
+miniBtn.Size = UDim2.new(0, 40, 0, 40)
+miniBtn.Position = UDim2.new(1, -50, 0, 10)
+miniBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
+miniBtn.BorderSizePixel = 0
+miniBtn.Text = "K"
+miniBtn.TextSize = 22
+miniBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+miniBtn.Font = Enum.Font.GothamBold
+miniBtn.Visible = false
+miniBtn.Parent = screenGui
+
+local miniCorner = Instance.new("UICorner")
+miniCorner.CornerRadius = UDim.new(0, 10)
+miniCorner.Parent = miniBtn
+
+local miniStroke = Instance.new("UIStroke")
+miniStroke.Color = Color3.fromRGB(0, 200, 255)
+miniStroke.Thickness = 1.5
+miniStroke.Parent = miniBtn
+
+local miniGlow = Instance.new("UIGradient")
+miniGlow.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 100, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 200, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 100, 255))
+})
+miniGlow.Rotation = 0
+miniGlow.Parent = miniStroke
+
+RunService.RenderStepped:Connect(function(dt)
+    if miniBtn.Visible then
+        miniGlow.Rotation = (miniGlow.Rotation + dt * 30) % 360
+    end
+end)
+
+-- ============================================
+-- HAUPT GUI FRAME
+-- ============================================
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 340, 0, 210)
+frame.Position = UDim2.new(1, -350, 0, 10)
+frame.BackgroundColor3 = Color3.fromRGB(8, 8, 16)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = frame
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(0, 180, 255)
+stroke.Thickness = 1.2
+stroke.Parent = frame
+
+local glow = Instance.new("UIGradient")
+glow.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 100, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 200, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 100, 255))
+})
+glow.Rotation = 0
+glow.Parent = stroke
+
+RunService.RenderStepped:Connect(function(dt)
+    if not _isMinimized then
+        glow.Rotation = (glow.Rotation + dt * 30) % 360
+    end
+end)
+
+-- HEADER
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 32)
+header.BackgroundColor3 = Color3.fromRGB(12, 12, 22)
+header.BorderSizePixel = 0
+header.Parent = frame
+
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 10)
+headerCorner.Parent = header
+
+local headerFill = Instance.new("Frame")
+headerFill.Size = UDim2.new(1, 0, 0, 10)
+headerFill.Position = UDim2.new(0, 0, 1, -10)
+headerFill.BackgroundColor3 = Color3.fromRGB(8, 8, 16)
+headerFill.BorderSizePixel = 0
+headerFill.Parent = header
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(0, 120, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.RichText = true
+titleLabel.Text = '<font color="rgb(173, 216, 230)">Krimo</font> <font color="rgb(0, 180, 255)">Hub</font>'
+titleLabel.TextSize = 13
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.TextYAlignment = Enum.TextYAlignment.Center
+titleLabel.Parent = header
+
+-- MINUS BUTTON
+local minusBtn = Instance.new("TextButton")
+minusBtn.Size = UDim2.new(0, 22, 0, 22)
+minusBtn.AnchorPoint = Vector2.new(1, 0.5)
+minusBtn.Position = UDim2.new(1, -8, 0.5, 0)
+minusBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+minusBtn.BorderSizePixel = 0
+minusBtn.Text = "−"
+minusBtn.TextSize = 16
+minusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minusBtn.Font = Enum.Font.GothamBold
+minusBtn.Parent = header
+
+local minusCorner = Instance.new("UICorner")
+minusCorner.CornerRadius = UDim.new(0, 5)
+minusCorner.Parent = minusBtn
+
+local minusStroke = Instance.new("UIStroke")
+minusStroke.Color = Color3.fromRGB(200, 50, 50)
+minusStroke.Thickness = 1
+minusStroke.Parent = minusBtn
+
+-- ON/OFF BUTTON
+local onBtn = Instance.new("TextButton")
+onBtn.Size = UDim2.new(0, 40, 0, 18)
+onBtn.AnchorPoint = Vector2.new(1, 0.5)
+onBtn.Position = UDim2.new(0.9, -8, 0.5, 0)
+onBtn.BackgroundColor3 = Color3.fromRGB(60, 220, 90)
+onBtn.BorderSizePixel = 0
+onBtn.AutoButtonColor = false
+onBtn.Text = "ON"
+onBtn.TextSize = 9
+onBtn.Font = Enum.Font.GothamBold
+onBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+onBtn.Parent = header
+
+local onCorner = Instance.new("UICorner")
+onCorner.CornerRadius = UDim.new(0, 5)
+onCorner.Parent = onBtn
+
+local onStroke = Instance.new("UIStroke")
+onStroke.Color = Color3.fromRGB(60, 220, 90)
+onStroke.Thickness = 1
+onStroke.Parent = onBtn
+
+-- STATUS
+local statusCard = Instance.new("Frame")
+statusCard.Size = UDim2.new(1, -16, 0, 24)
+statusCard.Position = UDim2.new(0, 8, 0, 38)
+statusCard.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+statusCard.BorderSizePixel = 0
+statusCard.Parent = frame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 6)
+statusCorner.Parent = statusCard
+
+local statusStroke = Instance.new("UIStroke")
+statusStroke.Color = Color3.fromRGB(30, 30, 50)
+statusStroke.Thickness = 1
+statusStroke.Parent = statusCard
+
+local dot = Instance.new("Frame")
+dot.Size = UDim2.new(0, 6, 0, 6)
+dot.Position = UDim2.new(0, 8, 0.5, -3)
+dot.BackgroundColor3 = Color3.fromRGB(80, 220, 100)
+dot.BorderSizePixel = 0
+dot.Parent = statusCard
+
+local dotCorner = Instance.new("UICorner")
+dotCorner.CornerRadius = UDim.new(0, 3)
+dotCorner.Parent = dot
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -22, 1, 0)
+statusLabel.Position = UDim2.new(0, 18, 0, 0)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Pick a TextBox first"
+statusLabel.TextSize = 10
+statusLabel.Font = Enum.Font.GothamMedium
+statusLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.TextYAlignment = Enum.TextYAlignment.Center
+statusLabel.Parent = statusCard
+
+-- DETECTED
+local detectedCard = Instance.new("Frame")
+detectedCard.Size = UDim2.new(1, -16, 0, 32)
+detectedCard.Position = UDim2.new(0, 8, 0, 66)
+detectedCard.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+detectedCard.BorderSizePixel = 0
+detectedCard.Parent = frame
+
+local detectedCorner = Instance.new("UICorner")
+detectedCorner.CornerRadius = UDim.new(0, 6)
+detectedCorner.Parent = detectedCard
+
+local detectedStroke = Instance.new("UIStroke")
+detectedStroke.Color = Color3.fromRGB(30, 30, 50)
+detectedStroke.Thickness = 1
+detectedStroke.Parent = detectedCard
+
+local detectedLabel = Instance.new("TextLabel")
+detectedLabel.Size = UDim2.new(1, -10, 0, 10)
+detectedLabel.Position = UDim2.new(0, 8, 0, 4)
+detectedLabel.BackgroundTransparency = 1
+detectedLabel.Text = "DETECTED"
+detectedLabel.TextSize = 7
+detectedLabel.Font = Enum.Font.GothamBold
+detectedLabel.TextColor3 = Color3.fromRGB(100, 100, 140)
+detectedLabel.TextXAlignment = Enum.TextXAlignment.Left
+detectedLabel.Parent = detectedCard
+
+local detectedCode = Instance.new("TextLabel")
+detectedCode.Size = UDim2.new(1, -10, 0, 16)
+detectedCode.Position = UDim2.new(0, 8, 0, 14)
+detectedCode.BackgroundTransparency = 1
+detectedCode.Text = "-"
+detectedCode.TextSize = 14
+detectedCode.Font = Enum.Font.GothamBold
+detectedCode.TextColor3 = Color3.fromRGB(80, 220, 100)
+detectedCode.TextXAlignment = Enum.TextXAlignment.Left
+detectedCode.TextYAlignment = Enum.TextYAlignment.Center
+detectedCode.Parent = detectedCard
+
+-- AUTO ENTER + AFTER + WORDS
+local autoRow = Instance.new("Frame")
+autoRow.Size = UDim2.new(1, -16, 0, 26)
+autoRow.Position = UDim2.new(0, 8, 0, 102)
+autoRow.BackgroundTransparency = 1
+autoRow.Parent = frame
+
+local autoLeft = Instance.new("Frame")
+autoLeft.Size = UDim2.new(0.33, -2, 1, 0)
+autoLeft.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+autoLeft.BorderSizePixel = 0
+autoLeft.Parent = autoRow
+
+local autoLeftCorner = Instance.new("UICorner")
+autoLeftCorner.CornerRadius = UDim.new(0, 5)
+autoLeftCorner.Parent = autoLeft
+
+local autoLeftStroke = Instance.new("UIStroke")
+autoLeftStroke.Color = Color3.fromRGB(30, 30, 50)
+autoLeftStroke.Thickness = 1
+autoLeftStroke.Parent = autoLeft
+
+local autoLabel = Instance.new("TextLabel")
+autoLabel.Size = UDim2.new(1, -6, 1, 0)
+autoLabel.Position = UDim2.new(0, 6, 0, 0)
+autoLabel.BackgroundTransparency = 1
+autoLabel.Text = "Auto Enter"
+autoLabel.TextSize = 10
+autoLabel.Font = Enum.Font.GothamBold
+autoLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
+autoLabel.TextXAlignment = Enum.TextXAlignment.Left
+autoLabel.TextYAlignment = Enum.TextYAlignment.Center
+autoLabel.Parent = autoLeft
+
+local afterBox = Instance.new("TextBox")
+afterBox.Size = UDim2.new(0.33, -2, 1, 0)
+afterBox.Position = UDim2.new(0.33, 2, 0, 0)
+afterBox.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+afterBox.BorderSizePixel = 0
+afterBox.Text = "3"
+afterBox.TextColor3 = Color3.fromRGB(80, 220, 100)
+afterBox.TextSize = 11
+afterBox.Font = Enum.Font.GothamBold
+afterBox.TextXAlignment = Enum.TextXAlignment.Center
+afterBox.Parent = autoRow
+
+local afterCorner = Instance.new("UICorner")
+afterCorner.CornerRadius = UDim.new(0, 5)
+afterCorner.Parent = afterBox
+
+local afterStroke = Instance.new("UIStroke")
+afterStroke.Color = Color3.fromRGB(30, 30, 50)
+afterStroke.Thickness = 1
+afterStroke.Parent = afterBox
+
+local wordsBox = Instance.new("Frame")
+wordsBox.Size = UDim2.new(0.34, -2, 1, 0)
+wordsBox.Position = UDim2.new(0.66, 2, 0, 0)
+wordsBox.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+wordsBox.BorderSizePixel = 0
+wordsBox.Parent = autoRow
+
+local wordsCorner = Instance.new("UICorner")
+wordsCorner.CornerRadius = UDim.new(0, 5)
+wordsCorner.Parent = wordsBox
+
+local wordsStroke = Instance.new("UIStroke")
+wordsStroke.Color = Color3.fromRGB(30, 30, 50)
+wordsStroke.Thickness = 1
+wordsStroke.Parent = wordsBox
+
+local wordsLabel = Instance.new("TextLabel")
+wordsLabel.Size = UDim2.new(1, 0, 1, 0)
+wordsLabel.BackgroundTransparency = 1
+wordsLabel.Text = "0/3"
+wordsLabel.TextSize = 12
+wordsLabel.Font = Enum.Font.GothamBold
+wordsLabel.TextColor3 = Color3.fromRGB(80, 220, 100)
+wordsLabel.TextXAlignment = Enum.TextXAlignment.Center
+wordsLabel.TextYAlignment = Enum.TextYAlignment.Center
+wordsLabel.Parent = wordsBox
+
+-- BUTTON ROW 1
+local btnRow1 = Instance.new("Frame")
+btnRow1.Size = UDim2.new(1, -16, 0, 22)
+btnRow1.Position = UDim2.new(0, 8, 0, 132)
+btnRow1.BackgroundTransparency = 1
+btnRow1.Parent = frame
+
+local pickBtn = Instance.new("TextButton")
+pickBtn.Size = UDim2.new(0.5, -3, 1, 0)
+pickBtn.Position = UDim2.new(0, 0, 0, 0)
+pickBtn.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+pickBtn.BorderSizePixel = 0
+pickBtn.Text = "Pick Box"
+pickBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
+pickBtn.TextSize = 10
+pickBtn.Font = Enum.Font.GothamBold
+pickBtn.Parent = btnRow1
+
+local pickCorner = Instance.new("UICorner")
+pickCorner.CornerRadius = UDim.new(0, 5)
+pickCorner.Parent = pickBtn
+
+local pickStroke = Instance.new("UIStroke")
+pickStroke.Color = Color3.fromRGB(30, 30, 50)
+pickStroke.Thickness = 1
+pickStroke.Parent = pickBtn
+
+local resetBtn = Instance.new("TextButton")
+resetBtn.Size = UDim2.new(0.5, -3, 1, 0)
+resetBtn.Position = UDim2.new(0.5, 3, 0, 0)
+resetBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+resetBtn.BorderSizePixel = 0
+resetBtn.Text = "Reset Words"
+resetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+resetBtn.TextSize = 10
+resetBtn.Font = Enum.Font.GothamBold
+resetBtn.Parent = btnRow1
+
+local resetCorner = Instance.new("UICorner")
+resetCorner.CornerRadius = UDim.new(0, 5)
+resetCorner.Parent = resetBtn
+
+local resetStroke = Instance.new("UIStroke")
+resetStroke.Color = Color3.fromRGB(200, 50, 50)
+resetStroke.Thickness = 1
+resetStroke.Parent = resetBtn
+
+-- BUTTON ROW 2
+local btnRow2 = Instance.new("Frame")
+btnRow2.Size = UDim2.new(1, -16, 0, 22)
+btnRow2.Position = UDim2.new(0, 8, 0, 158)
+btnRow2.BackgroundTransparency = 1
+btnRow2.Parent = frame
+
+local freezeBtn = Instance.new("TextButton")
+freezeBtn.Size = UDim2.new(0.5, -3, 1, 0)
+freezeBtn.Position = UDim2.new(0, 0, 0, 0)
+freezeBtn.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+freezeBtn.BorderSizePixel = 0
+freezeBtn.Text = "Freeze"
+freezeBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
+freezeBtn.TextSize = 10
+freezeBtn.Font = Enum.Font.GothamBold
+freezeBtn.Parent = btnRow2
+
+local freezeCorner = Instance.new("UICorner")
+freezeCorner.CornerRadius = UDim.new(0, 5)
+freezeCorner.Parent = freezeBtn
+
+local freezeStroke = Instance.new("UIStroke")
+freezeStroke.Color = Color3.fromRGB(30, 30, 50)
+freezeStroke.Thickness = 1
+freezeStroke.Parent = freezeBtn
+
+local autoBuyBtn = Instance.new("TextButton")
+autoBuyBtn.Size = UDim2.new(0.5, -3, 1, 0)
+autoBuyBtn.Position = UDim2.new(0.5, 3, 0, 0)
+autoBuyBtn.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+autoBuyBtn.BorderSizePixel = 0
+autoBuyBtn.Text = "Auto Buy"
+autoBuyBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
+autoBuyBtn.TextSize = 10
+autoBuyBtn.Font = Enum.Font.GothamBold
+autoBuyBtn.Parent = btnRow2
+
+local autoBuyCorner = Instance.new("UICorner")
+autoBuyCorner.CornerRadius = UDim.new(0, 5)
+autoBuyCorner.Parent = autoBuyBtn
+
+local autoBuyStroke = Instance.new("UIStroke")
+autoBuyStroke.Color = Color3.fromRGB(30, 30, 50)
+autoBuyStroke.Thickness = 1
+autoBuyStroke.Parent = autoBuyBtn
+
+-- CREDIT
+local creditLabel = Instance.new("TextLabel")
+creditLabel.Size = UDim2.new(1, 0, 0, 16)
+creditLabel.Position = UDim2.new(0, 0, 0, 193)
+creditLabel.BackgroundTransparency = 1
+creditLabel.RichText = true
+creditLabel.Text = '<font color="rgb(100, 100, 140)">made by momo.1711</font> <font color="rgb(0, 180, 255)">|</font> <font color="rgb(100, 100, 140)">discord.gg/JqQbTRHVEF</font>'
+creditLabel.TextSize = 9
+creditLabel.Font = Enum.Font.Gotham
+creditLabel.TextColor3 = Color3.fromRGB(100, 100, 140)
+creditLabel.TextXAlignment = Enum.TextXAlignment.Center
+creditLabel.TextYAlignment = Enum.TextYAlignment.Center
+creditLabel.Parent = frame
+
+-- ============================================
+-- MINIMIZE
+-- ============================================
+local function toggleMinimize()
+    _isMinimized = not _isMinimized
+    if _isMinimized then
+        frame.Visible = false
+        miniBtn.Visible = true
+        minusBtn.Text = "+"
+        minusBtn.BackgroundColor3 = Color3.fromRGB(60, 220, 90)
+        minusStroke.Color = Color3.fromRGB(60, 220, 90)
+    else
+        frame.Visible = true
+        miniBtn.Visible = false
+        minusBtn.Text = "−"
+        minusBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        minusStroke.Color = Color3.fromRGB(200, 50, 50)
+    end
+end
+
+minusBtn.MouseButton1Click:Connect(toggleMinimize)
+miniBtn.MouseButton1Click:Connect(toggleMinimize)
+
+-- ============================================
+-- FUNCTIONS
+-- ============================================
+local function updateWordDisplay()
+    wordsLabel.Text = _wordCount .. "/" .. _targetCount
+    if _wordCount >= _targetCount then
+        wordsLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+        dot.BackgroundColor3 = Color3.fromRGB(80, 255, 80)
+        wordsStroke.Color = Color3.fromRGB(80, 255, 80)
+    else
+        wordsLabel.TextColor3 = Color3.fromRGB(80, 220, 100)
+        dot.BackgroundColor3 = Color3.fromRGB(80, 220, 100)
+        wordsStroke.Color = Color3.fromRGB(30, 30, 50)
+    end
+end
+
+local function setStatus(text, color)
+    statusLabel.Text = text
+    if color then
+        statusLabel.TextColor3 = color
+        dot.BackgroundColor3 = color
+    end
+end
+
+local function stopPicking()
+    pickMode = false
+    pickBtn.Text = "Pick Box"
+    pickBtn.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+    pickBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
+    pickStroke.Color = Color3.fromRGB(30, 30, 50)
+end
+
+local function flashCode(code)
+    detectedCode.Text = code
+    detectedCode.TextColor3 = Color3.fromRGB(80, 255, 120)
+    detectedStroke.Color = Color3.fromRGB(80, 255, 120)
+end
+
+-- ============================================
+-- FREEZE
+-- ============================================
+local function toggleFreeze()
+    _frozen = not _frozen
+    local character = LocalPlayer.Character
+    if not character then return end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+    
+    if _frozen then
+        if root then root.Anchored = true end
+        if humanoid then
+            humanoid.PlatformStand = true
+            humanoid.Sit = true
+        end
+        freezeBtn.Text = "Unfreeze"
+        freezeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        freezeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        freezeStroke.Color = Color3.fromRGB(200, 50, 50)
+        setStatus("Frozen!", Color3.fromRGB(80, 220, 255))
+    else
+        if root then root.Anchored = false end
+        if humanoid then
+            humanoid.PlatformStand = false
+            humanoid.Sit = false
+        end
+        freezeBtn.Text = "Freeze"
+        freezeBtn.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+        freezeBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
+        freezeStroke.Color = Color3.fromRGB(30, 30, 50)
+        setStatus("Unfrozen!", Color3.fromRGB(255, 200, 50))
+    end
+end
+
+-- ============================================
+-- AUTO BUY
+-- ============================================
+local function isProximityPrompt(obj)
+    if not obj or not obj:IsA("ProximityPrompt") then return false end
+    local parent = obj.Parent
+    if not parent or parent.Name ~= "PromptAttachment" then return false end
+    local parent2 = parent.Parent
+    if not parent2 or parent2.Name ~= "Part" then return false end
+    local parent3 = parent2.Parent
+    return parent3 and parent3:IsA("Model") and true or false
+end
+
+local function getPromptPosition(prompt)
+    if prompt and prompt.Parent then
+        if prompt.Parent:IsA("Attachment") and prompt.Parent.Name == "PromptAttachment" then
+            local part = prompt.Parent.Parent
+            if part and part.Name == "Part" then
+                return part.Position
+            end
+        elseif prompt.Parent:IsA("BasePart") then
+            return prompt.Parent.Position
+        elseif prompt.Parent:IsA("Model") and prompt.Parent.PrimaryPart then
+            return prompt.Parent.PrimaryPart.Position
+        end
+    end
+    return nil
+end
+
+local function isPromptOnScreen(prompt)
+    local pos = getPromptPosition(prompt)
+    if not pos then return false end
+    local _, onScreen = Workspace.CurrentCamera:WorldToViewportPoint(pos)
+    return onScreen
+end
+
+local function holdPrompt(prompt)
+    pcall(function()
+        prompt:InputHoldBegin(Enum.UserInputType.MouseButton1)
+        prompt:InputHoldBegin(Enum.UserInputType.Touch)
+    end)
+end
+
+local function releasePrompt(prompt)
+    pcall(function()
+        prompt:InputHoldEnd(Enum.UserInputType.MouseButton1)
+        prompt:InputHoldEnd(Enum.UserInputType.Touch)
+    end)
+end
+
+local function addPrompt(prompt)
+    if isProximityPrompt(prompt) and not _proximityPrompts[prompt] then
+        _proximityPrompts[prompt] = true
+    end
+end
+
+local function startAutoBuy()
+    if _autoBuyRunning then return end
+    _autoBuyRunning = true
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        addPrompt(obj)
+    end
+    
+    _promptConnection = Workspace.DescendantAdded:Connect(addPrompt)
+    
+    _renderConnection = RunService.RenderStepped:Connect(function()
+        if not _autoBuyRunning then return end
+        local character = LocalPlayer.Character
+        if not character then return end
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+        
+        for prompt, _ in pairs(_proximityPrompts) do
+            if prompt and prompt.Parent and isProximityPrompt(prompt) then
+                local pos = getPromptPosition(prompt)
+                if pos then
+                    local distance = (rootPart.Position - pos).Magnitude
+                    local onScreen = isPromptOnScreen(prompt)
+                    if distance < 15 and onScreen then
+                        holdPrompt(prompt)
+                    else
+                        releasePrompt(prompt)
+                    end
+                else
+                    _proximityPrompts[prompt] = nil
+                end
+            else
+                _proximityPrompts[prompt] = nil
+            end
+        end
+    end)
+    
+    setStatus("Auto Buy ON - Buying!", Color3.fromRGB(80, 255, 120))
+end
+
+local function stopAutoBuy()
+    _autoBuyRunning = false
+    if _renderConnection then
+        _renderConnection:Disconnect()
+        _renderConnection = nil
+    end
+    if _promptConnection then
+        _promptConnection:Disconnect()
+        _promptConnection = nil
+    end
+    for prompt, _ in pairs(_proximityPrompts) do
+        releasePrompt(prompt)
+    end
+    _proximityPrompts = {}
+    setStatus("Auto Buy OFF", Color3.fromRGB(255, 200, 50))
+end
+
+local function toggleAutoBuy()
+    if _autoBuyRunning then
+        stopAutoBuy()
+        autoBuyBtn.Text = "Auto Buy"
+        autoBuyBtn.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+        autoBuyBtn.TextColor3 = Color3.fromRGB(200, 200, 220)
+        autoBuyStroke.Color = Color3.fromRGB(30, 30, 50)
+    else
+        startAutoBuy()
+        autoBuyBtn.Text = "Stop Buy"
+        autoBuyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        autoBuyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        autoBuyStroke.Color = Color3.fromRGB(200, 50, 50)
+    end
+end
+
+freezeBtn.MouseButton1Click:Connect(toggleFreeze)
+autoBuyBtn.MouseButton1Click:Connect(toggleAutoBuy)
+
+-- RESET
+resetBtn.MouseButton1Click:Connect(function()
+    _collectedCodes = {}
+    _wordCount = 0
+    updateWordDisplay()
+    setStatus("Words Reset! " .. _wordCount .. "/" .. _targetCount, Color3.fromRGB(255, 200, 50))
+    task.delay(2, function()
+        if _enabled then
+            setStatus("Auto-Enter ON", Color3.fromRGB(80, 255, 120))
+        else
+            setStatus("Auto-Enter OFF", Color3.fromRGB(255, 200, 50))
+        end
+    end)
+end)
+
+-- DRAG
+local dragging, dragStart, startPos
+
+local function onInputBegan(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+    end
+end
+
+local function onInputChanged(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+    or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end
+
+local function onInputEnded(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end
+
+frame.InputBegan:Connect(onInputBegan)
+frame.InputChanged:Connect(onInputChanged)
+frame.InputEnded:Connect(onInputEnded)
+UserInputService.InputChanged:Connect(onInputChanged)
+
+-- ON/OFF
+onBtn.MouseButton1Click:Connect(function()
+    _enabled = not _enabled
+    if _enabled then
+        onBtn.Text = "ON"
+        onBtn.BackgroundColor3 = Color3.fromRGB(60, 220, 90)
+        onBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+        onStroke.Color = Color3.fromRGB(60, 220, 90)
+        setStatus("Auto-Enter ON", Color3.fromRGB(80, 255, 120))
+        _collectedCodes = {}
+        _wordCount = 0
+        updateWordDisplay()
+    else
+        onBtn.Text = "OFF"
+        onBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        onBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        onStroke.Color = Color3.fromRGB(220, 60, 60)
+        setStatus("Auto-Enter OFF", Color3.fromRGB(255, 200, 50))
+        _collectedCodes = {}
+        _wordCount = 0
+        updateWordDisplay()
+    end
+end)
+
+-- PICK BOX
+pickBtn.MouseButton1Click:Connect(function()
+    if pickMode then
+        stopPicking()
+        return
+    end
+    pickMode = true
+    pickBtn.Text = "Click into any TextBox..."
+    pickBtn.BackgroundColor3 = Color3.fromRGB(255, 160, 20)
+    pickBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    pickStroke.Color = Color3.fromRGB(255, 160, 20)
+    setStatus("Click into the box you want codes in", Color3.fromRGB(255, 200, 50))
+end)
+
+local function watchTextBox(obj)
+    if not obj:IsA("TextBox") then return end
+    if obj:IsDescendantOf(screenGui) then return end
+    obj.Focused:Connect(function()
+        if not pickMode then return end
+        targetBox = obj
+        stopPicking()
+        setStatus("Target: " .. obj.Name, Color3.fromRGB(80, 255, 120))
+    end)
+end
+
+for _, obj in ipairs(PlayerGui:GetDescendants()) do
+    watchTextBox(obj)
+end
+
+PlayerGui.DescendantAdded:Connect(function(obj)
+    task.wait()
+    watchTextBox(obj)
+end)
+
+-- AFTER BOX
+afterBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local text = afterBox.Text
+    if text ~= "" and not tonumber(text) then
+        afterBox.Text = text:gsub("[^%d]", "")
+        return
+    end
+    if text == "" then return end
+    local num = tonumber(text)
+    if num ~= nil then
+        if num < 1 then
+            afterBox.Text = "1"
+            num = 1
+        elseif num > 10 then
+            afterBox.Text = "10"
+            num = 10
+        end
+        _targetCount = num
+        updateWordDisplay()
+    end
+end)
+
+afterBox.FocusLost:Connect(function()
+    if afterBox.Text == "" then
+        afterBox.Text = "3"
+        _targetCount = 3
+        updateWordDisplay()
+    end
+end)
+
+-- PRESS ENTER
+local function pressEnter()
+    pcall(function()
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+    end)
+    pcall(function()
+        if targetBox and targetBox:IsA("TextBox") then
+            targetBox:ReleaseFocus(true)
+        end
+    end)
+    pcall(function()
+        if PlayerGui then
+            for _, obj in ipairs(PlayerGui:GetDescendants()) do
+                if (obj:IsA("TextButton") or obj:IsA("ImageButton")) and obj.Visible then
+                    local name = string.lower(obj.Name)
+                    local text = obj:IsA("TextButton") and string.lower(obj.Text) or ""
+                    if name:find("submit") or name:find("redeem") or name:find("claim") or
+                       text:find("submit") or text:find("redeem") or text:find("claim") then
+                        if obj:FindFirstChild("MouseButton1Click") then
+                            for _, conn in ipairs(getconnections(obj.MouseButton1Click)) do
+                                pcall(function() conn:Fire() end)
+                            end
+                        end
+                        pcall(function()
+                            obj:CaptureFocus()
+                            obj:ReleaseFocus(true)
+                        end)
+                        break
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- COLLECT & REDEEM
+local function collectAndRedeem(code)
+    if not code or code == "" then return end
+    if not _enabled then return end
+    if _processingLock then return end
+    _processingLock = true
+    
+    local cleanCode = string.upper(string.gsub(code, "%s+", ""))
+    
+    table.insert(_collectedCodes, cleanCode)
+    _wordCount = #_collectedCodes
+    updateWordDisplay()
+    
+    setStatus(_wordCount.."/".._targetCount.." codes", Color3.fromRGB(80, 220, 100))
+    flashCode(cleanCode)
+    
+    if _wordCount >= _targetCount then
+        setStatus("Redeeming...", Color3.fromRGB(80, 255, 120))
+        if targetBox and targetBox:IsA("TextBox") then
+            local combined = table.concat(_collectedCodes, " ")
+            pcall(function()
+                targetBox.Text = combined
+                targetBox.CursorPosition = #combined + 1
+            end)
+        end
+        task.wait(0.01)
+        pressEnter()
+        _enabled = false
+        onBtn.Text = "OFF"
+        onBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        onBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        onStroke.Color = Color3.fromRGB(220, 60, 60)
+        setStatus("Redeemed! Auto OFF", Color3.fromRGB(255, 200, 50))
+        _collectedCodes = {}
+        _wordCount = 0
+        updateWordDisplay()
+    end
+    _processingLock = false
+end
+
+-- PASTE CODE
+local function pasteCode(text)
+    if not _enabled then return end
+    local code = text:gsub("%s+", "")
+    if code == "" then return end
+    if not targetBox then
+        setStatus("No box selected — click Pick Box", Color3.fromRGB(255, 80, 80))
+        return
+    end
+    if not targetBox.Parent then
+        setStatus("Box gone — pick again", Color3.fromRGB(255, 80, 80))
+        targetBox = nil
+        return
+    end
+    if targetBox.Text == "" or targetBox.Text == " " then
+        targetBox.Text = code
+    else
+        targetBox.Text = targetBox.Text .. "\n" .. code
+    end
+    setStatus("Pasted: " .. code, Color3.fromRGB(80, 255, 120))
+    flashCode(code)
+    collectAndRedeem(code)
+end
+
+-- GLOBAL BROADCAST REMOTE HOOK
+local KNOWN_HASH = "631ab0616c0445747139929dee141f4f24b2d7393b69ef081421b99587bfe780"
+local globalRemote = nil
+local _hookActive = false
+
+local function isGlobalBroadcast(a1, a2, a3)
+    if type(a1) ~= "string" then return false end
+    if #a1 < 1 or #a1 > 500 then return false end
+    if type(a2) ~= "number" then return false end
+    if type(a3) ~= "string" then return false end
+    if not a3:find("Sounds", 1, true) then return false end
+    return true
+end
+
+local function hookRemote(remote)
+    if globalRemote then return end
+    globalRemote = remote
+    _hookActive = true
+    setStatus("Listening — pick a box!", Color3.fromRGB(80, 255, 120))
+    remote.OnClientEvent:Connect(function(a1, a2, a3)
+        if type(a1) ~= "string" or #a1 < 1 then return end
+        pasteCode(a1)
+    end)
+end
+
+task.spawn(function()
+    local ok, net = pcall(function()
+        return RS:WaitForChild("Packages", 10):WaitForChild("Net", 10)
+    end)
+    if not ok or not net then
+        setStatus("Net folder missing — rejoin?", Color3.fromRGB(255, 80, 80))
+        return
+    end
+
+    local function findByHash(parent)
+        for _, child in ipairs(parent:GetChildren()) do
+            if child:IsA("RemoteEvent") and child.Name:find(KNOWN_HASH, 1, true) then
+                return child
+            end
+            local r = findByHash(child)
+            if r then return r end
+        end
+    end
+    local found = findByHash(net)
+    if found then
+        hookRemote(found)
+        return
+    end
+
+    setStatus("Auto-detecting broadcast remote...", Color3.fromRGB(200, 200, 50))
+
+    local function attachCandidate(remote)
+        remote.OnClientEvent:Connect(function(a1, a2, a3)
+            if globalRemote then return end
+            if isGlobalBroadcast(a1, a2, a3) then
+                hookRemote(remote)
+            end
+        end)
+    end
+
+    local function scan(parent)
+        for _, child in ipairs(parent:GetChildren()) do
+            if child:IsA("RemoteEvent") then attachCandidate(child) end
+            pcall(scan, child)
+        end
+    end
+    scan(net)
+    net.DescendantAdded:Connect(function(obj)
+        if obj:IsA("RemoteEvent") and not globalRemote then
+            attachCandidate(obj)
+        end
+    end)
+end)
+
+updateWordDisplay()
+setStatus("Pick a TextBox first", Color3.fromRGB(180, 180, 200))
