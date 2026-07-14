@@ -1,39 +1,37 @@
 --[[
-    KRIMO HUB - ULTRA INSTANT REDEEM (0.001s)
+    KRIMO HUB - BAC-6511 BYPASS + ALLE BAC CODES
     Made by momo.1711
 ]]
 
 -- ============================================
--- BAC COMPLETE BYPASS
+-- BAC-6511 & ALLE ANDEREN BYPASS
 -- ============================================
+
+-- 1. KICK BYPASS (BAC-4518)
 pcall(function()
     local LP = game:GetService("Players").LocalPlayer
     LP.Kick = function() return nil end
     LP.kick = function() return nil end
 end)
 
+-- 2. SCRIPT NAME SPOOFING (BAC-6512)
 pcall(function()
     if getfenv and getfenv().script then
         getfenv().script.Name = "System_" .. tostring(math.random(10000,99999))
     end
 end)
 
-pcall(function()
-    local old = getrawmetatable(game)
-    if old then
-        setreadonly(old, false)
-        old.__namecall = old.__namecall or function() end
-        old.__index = old.__index or function() end
-        old.__newindex = old.__newindex or function() end
-    end
-end)
+-- 3. KEIN getrawmetatable MEHR! (BAC-6511)
+-- Das war der Fehler! getrawmetatable wird erkannt.
 
+-- 4. DEAKTIVIERE DEBUG (BAC-6519)
 pcall(function()
     debug.info = function() return nil end
     debug.getinfo = function() return nil end
     debug.getupvalue = function() return nil end
 end)
 
+-- 5. VERSTECKE SCRIPT
 pcall(function()
     local s = getfenv().script
     if s then
@@ -42,8 +40,17 @@ pcall(function()
     end
 end)
 
+-- 6. TASK.WAIT BYPASS
+pcall(function()
+    local oldWait = task.wait
+    task.wait = function(t)
+        if t and t > 0.5 then t = 0.3 end
+        return oldWait(t or 0)
+    end
+end)
+
 -- ============================================
--- ORIGINAL CODE (MIT EXTRA SPEED)
+-- ORIGINAL CODE (UNVERÄNDERT)
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -73,7 +80,7 @@ local _renderConnection = nil
 local _isMinimized = false
 
 -- ============================================
--- GUI (SELBE WIE VORHER)
+-- GUI
 -- ============================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "KrimoHub"
@@ -810,7 +817,8 @@ local function watchTextBox(obj)
     if not obj:IsA("TextBox") then return end
     if obj:IsDescendantOf(screenGui) then return end
     obj.Focused:Connect(function()
-        if not pickMode then return end        targetBox = obj
+        if not pickMode then return end
+        targetBox = obj
         stopPicking()
         setStatus("Target: " .. obj.Name, Color3.fromRGB(80, 255, 120))
     end)
@@ -856,7 +864,7 @@ afterBox.FocusLost:Connect(function()
 end)
 
 -- ============================================
--- ULTRA INSTANT REDEEM (0.001 Sekunden)
+-- ULTRA INSTANT REDEEM (0.001s)
 -- ============================================
 local function pressEnter()
     pcall(function()
@@ -895,7 +903,7 @@ local function collectAndRedeem(code)
             end)
         end
         
-        task.wait(0.001)  -- ⚡ ULTRA INSTANT (1ms)
+        task.wait(0.001)
         pressEnter()
         
         _enabled = false
@@ -912,9 +920,7 @@ local function collectAndRedeem(code)
     _processingLock = false
 end
 
--- ============================================
 -- PASTE CODE
--- ============================================
 local function pasteCode(text)
     if not _enabled then return end
     local code = text:gsub("%s+", "")
